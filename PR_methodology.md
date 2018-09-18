@@ -11,6 +11,126 @@ Loading packages and defining functions
 
 This analysis makes use of many R packages and they're all loaded in this cell. There are also several user-defined mapping functions that are convinient for getting the data in the right shape to plot.
 
+``` r
+knitr::opts_chunk$set(echo = TRUE)
+suppressMessages(require(bigrquery));
+suppressMessages(require(zipcode));
+suppressMessages(require(tidyverse));
+suppressMessages(require(glue));
+suppressMessages(require(downloader));
+suppressMessages(require(ggplot2));
+suppressMessages(require (rgdal));
+suppressMessages(require (rgeos));
+suppressMessages(require(maptools));
+suppressMessages(require(viridis));
+suppressMessages(require(lubridate));
+suppressMessages(require(RColorBrewer));
+suppressMessages(require(reshape2));
+suppressMessages(require(ggridges));
+suppressMessages(require(gridExtra));
+suppressMessages(library(deldir));
+suppressMessages(library(tidycensus));
+suppressMessages(library(sp));
+suppressMessages(library(sf));
+suppressMessages(library(tigris));
+suppressMessages(library(spatstat));
+suppressMessages(library(maptools)); 
+suppressMessages(library(lwgeom))
+
+iqr_plot <-function(D, cutoff_date, titles, D.to.join=NULL, labs){
+  res<-D%>%data.frame()%>%group_by(day)%>%
+    summarise("min"=summary(num)[1],"1q"=summary(num)[2], "med"=summary(num)[3], "mea"=summary(num)[4],
+              "3q"=summary(num)[5], "max"=summary(num)[6], "num"=n())
+  res$day<-ymd(res$day)
+  
+  if(class(D.to.join)[1]!="NULL"){
+    res1<-left_join(res, D.to.join)
+    res1<-res1%>%filter(day>ymd(cutoff_date))
+    var.l<-c(2,3,5,9)
+  }else{
+    res1<-res%>%filter(day>ymd(cutoff_date))
+    var.l<-c(2,3,5)
+  }
+  
+  res1<-melt(res1, variable.name = "keys", value.name = "speeds", id.vars = "day")
+  res1<-data.frame("day"=ymd(res1$day), "sum_type"=as.factor(res1$keys), "speed"=as.numeric(res1$speeds))
+  
+  plasma_pal <- magma(5)[c(1,4,2)]
+  plasma_pal<-c(plasma_pal,alpha(c("#C0C0C0","#C0C0C0"),.7 ))
+  
+  res1%>%filter(sum_type%in%levels(res1$sum_type)[var.l])%>%ggplot(aes(x=day, y = speed, col=sum_type))+
+    geom_line(size =.6)+theme_scatter()+labs(x = "Dates", y = "Mbps",title = titles)+
+    scale_color_manual(values = plasma_pal, labels=labs, name="")
+    
+}
+
+theme_map <- function(...) {
+  theme_minimal() +
+    theme(
+      text = element_text(family = "Ubuntu Regular", color = "#22211d"),
+      axis.line = element_blank(),
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank(),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      # panel.grid.minor = element_line(color = "#ebebe5", size = 0.2),
+      panel.grid.major = element_line(color = "#ebebe5", size = 0.2),
+      panel.grid.minor = element_blank(),
+      plot.background = element_rect(fill = "#f5f5f2", color = NA), 
+      panel.background = element_rect(fill = "#f5f5f2", color = NA), 
+      legend.background = element_rect(fill = "#f5f5f2", color = NA),
+      panel.border = element_blank(),
+      ...
+    )
+}
+theme_scatter <- function(...) {
+  theme_minimal() +
+    theme(
+      text = element_text(family = "Ubuntu Regular", color = "#22211d"),
+      # panel.grid.minor = element_line(color = "#ebebe5", size = 0.2),
+      panel.grid.major = element_line(color = "#ebebe5", size = 0.2),
+      panel.grid.minor = element_blank(),
+      plot.background = element_rect(fill = "#f5f5f2", color = NA), 
+      panel.background = element_rect(fill = "#f5f5f2", color = NA), 
+      legend.background = element_rect(fill = "#f5f5f2", color = NA),
+      panel.border = element_blank(),
+      ...
+    )
+}
+
+map_prep<-function(D.map, quants, no_classes, NA_val){
+  cols_temp<-D.map$med
+  if(length(quants)==1){
+    labels <- c()
+    quantiles <- quantile(na.omit(cols_temp) , probs = seq(0, 1, length.out = no_classes + 1))
+    labels <- c()
+    for(idx in 1:length(quantiles)){
+      labels <- c(labels, paste0(round(quantiles[idx], 2), " - ", round(quantiles[idx + 1], 2)))
+    }
+    labels <- labels[1:length(labels)-1]
+    cols_temp <- cut(cols_temp, breaks = quantiles, labels = labels, include.lowest = T)
+  }else{
+    labels <- c()
+    for(idx in 1:length(quants)){
+      labels <- c(labels, paste0(round(quants[idx], 2), " - ", round(quants[idx + 1], 2)))
+    }
+    labels <- labels[1:length(labels)-1]
+    cols_temp <- cut(cols_temp, breaks = quants, labels = labels, include.lowest = T)
+  }
+  
+  cols_temp<-`levels<-`(addNA(cols_temp), c(levels(cols_temp), NA_val))
+  
+  cols<-as.factor(cols_temp)
+  cols<- factor(cols, levels = levels(cols)[order(as.numeric(str_trim(lapply(str_split(levels(cols),"-"), function(x)return(x[[1]])))))])
+  
+  
+  plasma_pal <- c(viridis::magma(n = length(levels(cols))))
+  D.map$med<-cols
+  return(list("data"=D.map, "colors"=plasma_pal))
+}
+```
+
 Using BigQuery to get M-lab data from the entire U.S. and Puerto Rico
 ---------------------------------------------------------------------
 
