@@ -142,7 +142,7 @@ The second query does something similar for the entire US but it skips a step be
 
 ``` r
 options(warn=-1)
-project <- "mlab-sandbox"
+project <- "INSERT PROJECT NAME HERE"
 sql_fmt <- "#standardSQL
 SELECT partition_date AS day, 8 *
 (web100_log_entry.snap.HCThruOctetsAcked /
