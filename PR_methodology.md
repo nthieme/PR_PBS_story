@@ -3,7 +3,7 @@ Puerto Rico Methodology
 Nick Thieme
 September 17, 2018
 
-This is the methodology behind the NOVA story at \[insert link\]
+This is the methodology behind the NOVA story at https://www.pbs.org/wgbh/nova/article/puerto-rico-hurricane-maria-internet
 ================================================================
 
 Loading packages and defining functions
